@@ -1,0 +1,88 @@
+import { useMemo, useState } from "react";
+import DashboardLayout from "@/components/DashboardLayout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Download, FileText, Calendar } from "lucide-react";
+import { getScansForCurrentUser } from "@/lib/storage";
+import { downloadScanReport } from "@/lib/report";
+import { format } from "date-fns";
+import { toast } from "sonner";
+
+const Reports = () => {
+  const [refresh] = useState(0);
+  const reports = useMemo(() => {
+    void refresh;
+    return getScansForCurrentUser();
+  }, [refresh]);
+
+  return (
+    <DashboardLayout title="Download Reports">
+      <div className="mb-8">
+        <h2 className="font-heading text-2xl font-bold text-foreground">Download Reports</h2>
+        <p className="text-sm text-muted-foreground">
+          Download plagiarism reports for your confirmed document scans
+        </p>
+      </div>
+
+      {reports.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            No reports yet. Complete an upload and confirm your document to generate a report.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {reports.map((r) => (
+            <Card key={r.id} className="transition-shadow hover:shadow-md">
+              <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                    <FileText className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {r.fileName.replace(/\.[^.]+$/, "")} — Plagiarism Report
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {format(new Date(r.createdAt), "MMM d, yyyy")}
+                      </span>
+                      <span>•</span>
+                      <span>{r.matchedSections.length} matches</span>
+                      <span>•</span>
+                      <span
+                        className={
+                          r.plagiarismPercent > 40
+                            ? "text-destructive"
+                            : r.plagiarismPercent > 20
+                              ? "text-yellow-600"
+                              : "text-success"
+                        }
+                      >
+                        {r.plagiarismPercent}% similarity
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => {
+                    downloadScanReport(r);
+                    toast.success("Report downloaded");
+                  }}
+                >
+                  <Download className="h-4 w-4" /> Download
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </DashboardLayout>
+  );
+};
+
+export default Reports;
