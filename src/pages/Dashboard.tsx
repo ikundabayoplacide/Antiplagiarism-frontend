@@ -1,20 +1,24 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { FileText, Upload, CheckCircle, AlertTriangle, BarChart3 } from "lucide-react";
 import StudentLayout from "@/components/student/StudentLayout";
 import StudentStatCard from "@/components/student/StudentStatCard";
 import QuickActions from "@/components/student/QuickActions";
-import RecentSubmissions from "@/components/student/RecentSubmissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getRecentSubmissions, getStudentGreeting, getStudentStats } from "@/lib/studentData";
-import { getPlagiarismResults } from "@/lib/studentData";
-import PlagiarismBadge from "@/components/admin/PlagiarismBadge";
+import { getStudentGreeting } from "@/lib/studentData";
+import { apiGetDocuments, type ApiDocument } from "@/lib/api";
 
 const Dashboard = () => {
-  const stats = getStudentStats();
-  const recentSubmissions = getRecentSubmissions(5);
-  const latestResults = getPlagiarismResults(3);
+  const [documents, setDocuments] = useState<ApiDocument[]>([]);
   const greeting = getStudentGreeting();
+
+  useEffect(() => {
+    apiGetDocuments().then(setDocuments).catch(() => {});
+  }, []);
+
+  const total = documents.length;
+  const recentDocs = documents.slice(0, 5);
 
   return (
     <StudentLayout title="Anti-Plagiarism System">
@@ -34,38 +38,10 @@ const Dashboard = () => {
       </div>
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StudentStatCard
-          icon={FileText}
-          title="Total Submissions"
-          value={stats.total}
-          subtitle="Documents checked"
-          trend={8.2}
-          trendUp
-        />
-        <StudentStatCard
-          icon={CheckCircle}
-          title="Original Documents"
-          value={stats.original}
-          subtitle="Passed plagiarism check"
-          iconColor="text-emerald-600"
-          iconBg="bg-emerald-50"
-        />
-        <StudentStatCard
-          icon={AlertTriangle}
-          title="Flagged Documents"
-          value={stats.flagged}
-          subtitle="Needs review"
-          iconColor="text-red-600"
-          iconBg="bg-red-50"
-        />
-        <StudentStatCard
-          icon={BarChart3}
-          title="Avg. Similarity"
-          value={`${stats.avgSimilarity}%`}
-          subtitle={`${stats.reports} reports available`}
-          iconColor="text-violet-600"
-          iconBg="bg-violet-50"
-        />
+        <StudentStatCard icon={FileText} title="Total Submissions" value={total} subtitle="Documents checked" trend={8.2} trendUp />
+        <StudentStatCard icon={CheckCircle} title="Documents" value={total} subtitle="Uploaded files" iconColor="text-emerald-600" iconBg="bg-emerald-50" />
+        <StudentStatCard icon={AlertTriangle} title="Storage Used" value={`${(documents.reduce((s, d) => s + d.fileSize, 0) / 1024 / 1024).toFixed(1)} MB`} subtitle="Total file size" iconColor="text-red-600" iconBg="bg-red-50" />
+        <StudentStatCard icon={BarChart3} title="Recent Uploads" value={recentDocs.length} subtitle="Last 5 documents" iconColor="text-violet-600" iconBg="bg-violet-50" />
       </div>
 
       <div className="mb-8">
@@ -77,41 +53,39 @@ const Dashboard = () => {
         <Card className="border-border/60 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="font-heading text-lg">Recent Submissions</CardTitle>
-            <Link to="/dashboard/history" className="text-sm font-medium text-primary hover:underline">
-              View history
-            </Link>
+            <Link to="/dashboard/documents" className="text-sm font-medium text-primary hover:underline">View all</Link>
           </CardHeader>
           <CardContent>
-            <RecentSubmissions submissions={recentSubmissions} />
+            {recentDocs.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No documents yet. Upload a document to get started.</p>
+            ) : (
+              <div className="space-y-3">
+                {recentDocs.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{doc.fileName ?? doc.id}</p>
+                      <p className="text-xs text-muted-foreground">{(doc.fileSize / 1024).toFixed(1)} KB</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card className="border-border/60 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="font-heading text-lg">Latest Plagiarism Results</CardTitle>
-            <Link to="/dashboard/results" className="text-sm font-medium text-primary hover:underline">
-              View all
-            </Link>
+          <CardHeader>
+            <CardTitle className="font-heading text-lg">Latest Uploads</CardTitle>
           </CardHeader>
           <CardContent>
-            {latestResults.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No results yet. Upload a document to run a plagiarism check.
-              </p>
+            {documents.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No results yet. Upload a document to run a plagiarism check.</p>
             ) : (
-              <div className="space-y-4">
-                {latestResults.map((result) => (
-                  <div
-                    key={result.id}
-                    className="flex items-center justify-between rounded-lg border border-border/60 p-4 transition-colors hover:bg-muted/30"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-foreground">{result.fileName}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {result.matchedSections.length} matches found · {result.wordCount.toLocaleString()} words
-                      </p>
-                    </div>
-                    <PlagiarismBadge percent={result.plagiarismPercent} />
+              <div className="space-y-3">
+                {documents.slice(0, 3).map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+                    <p className="truncate text-sm font-medium text-foreground">{doc.fileName ?? doc.id}</p>
+                    <span className="text-xs text-muted-foreground">{(doc.fileSize / 1024).toFixed(1)} KB</span>
                   </div>
                 ))}
               </div>

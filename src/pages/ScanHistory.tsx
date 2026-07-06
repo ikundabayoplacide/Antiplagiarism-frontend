@@ -1,40 +1,97 @@
-import { useMemo, useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { FileText, Search, Download, Eye, Trash2 } from "lucide-react";
-import { deleteScan, getScansForCurrentUser } from "@/lib/storage";
-import { downloadScanReport } from "@/lib/report";
-import type { ScanRecord } from "@/lib/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FileText, Search, Trash2, Eye, Pencil } from "lucide-react";
+import { apiGetDocuments, apiGetDocument, apiDeleteDocument, apiUpdateDocument, type ApiDocument } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
 const ScanHistory = () => {
+  const [documents, setDocuments] = useState<ApiDocument[]>([]);
   const [search, setSearch] = useState("");
-  const [refresh, setRefresh] = useState(0);
-  const [viewScan, setViewScan] = useState<ScanRecord | null>(null);
+  const [editingDoc, setEditingDoc] = useState<ApiDocument | null>(null);
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const editFileRef = useRef<HTMLInputElement>(null);
 
-  const documents = useMemo(() => {
-    void refresh;
-    return getScansForCurrentUser().filter((d) =>
-      d.fileName.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [search, refresh]);
-
-  const handleDelete = (id: string, name: string) => {
-    if (!confirm(`Remove "${name}" from your documents?`)) return;
-    deleteScan(id);
-    setRefresh((r) => r + 1);
-    toast.success("Document removed");
-    if (viewScan?.id === id) setViewScan(null);
+  const loadDocuments = async () => {
+    try {
+      const docs = await apiGetDocuments();
+      setDocuments(docs);
+    } catch {
+      toast.error("Failed to load documents.");
+    }
   };
+
+  useEffect(() => { loadDocuments(); }, []);
+
+  const handleView = async (id: string) => {
+    const doc = documents.find((d) => d.id === id);
+    if (!doc) return;
+    try {
+      const full = await apiGetDocument(id);
+      if (!full.content) { toast.error("No content available."); return; }
+      const byteChars = atob(full.content);
+      const bytes = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([bytes], { type: full.fileType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.fileName ?? doc.id;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to download document.");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingId) return;
+    setDeleteLoading(true);
+    try {
+      await apiDeleteDocument(deletingId);
+      toast.success("Document removed.");
+      setDeletingId(null);
+      loadDocuments();
+    } catch {
+      toast.error("Failed to delete document.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const openEdit = (doc: ApiDocument) => {
+    setEditingDoc(doc);
+    setEditFile(null);
+  };
+
+  const handleEdit = async () => {
+    if (!editingDoc || !editFile) return;
+    setEditLoading(true);
+    try {
+      await apiUpdateDocument(editingDoc.id, {
+        file: editFile,
+        fileName: editFile.name,
+      });
+      toast.success("Document updated.");
+      setEditingDoc(null);
+      loadDocuments();
+    } catch {
+      toast.error("Failed to update document.");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const filtered = documents.filter((d) =>
+    (d.fileName ?? d.id).toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <DashboardLayout title="My Documents">
@@ -56,95 +113,44 @@ const ScanHistory = () => {
 
       <Card>
         <CardContent className="p-0">
-          {documents.length === 0 ? (
+          {filtered.length === 0 ? (
             <p className="p-12 text-center text-sm text-muted-foreground">
-              No documents yet. Upload and confirm a scan from Upload Document.
+              No documents yet. Upload a file from Upload Document.
             </p>
           ) : (
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">
-                    Document
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">
-                    Words
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">
-                    Score
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">
-                    Actions
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">Document</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase text-muted-foreground">Size</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold uppercase text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {documents.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-border transition-colors last:border-0 hover:bg-muted/50"
-                  >
+                {filtered.map((item) => (
+                  <tr key={item.id} className="border-b border-border transition-colors last:border-0 hover:bg-muted/50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <FileText className="h-5 w-5 text-primary" />
-                        <span className="text-sm font-medium text-foreground">{item.fileName}</span>
+                        <span className="text-sm font-medium text-foreground">{item.fileName ?? item.id}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
                       {format(new Date(item.createdAt), "MMM d, yyyy")}
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {item.wordCount.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`text-sm font-semibold ${
-                          item.plagiarismPercent > 40
-                            ? "text-destructive"
-                            : item.plagiarismPercent > 20
-                              ? "text-yellow-600"
-                              : "text-success"
-                        }`}
-                      >
-                        {item.plagiarismPercent}%
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          item.status === "original"
-                            ? "bg-success/10 text-success"
-                            : "bg-destructive/10 text-destructive"
-                        }`}
-                      >
-                        {item.status === "original" ? "Original" : "Flagged"}
-                      </span>
+                      {(item.fileSize / 1024).toFixed(1)} KB
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setViewScan(item)} title="View">
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(item)} title="Edit">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleView(item.id)} title="Download">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => downloadScanReport(item)}
-                          title="Download report"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(item.id, item.fileName)}
-                          title="Remove"
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => setDeletingId(item.id)} title="Remove">
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -157,44 +163,45 @@ const ScanHistory = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={!!viewScan} onOpenChange={(open) => !open && setViewScan(null)}>
-        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
-          {viewScan && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{viewScan.fileName}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 text-sm">
-                <p>
-                  <strong>N-gram plagiarism:</strong> {viewScan.plagiarismPercent}%
-                </p>
-                <p>
-                  <strong>Original:</strong> {viewScan.originalPercent}% · <strong>Words:</strong>{" "}
-                  {viewScan.wordCount}
-                </p>
-                <p>
-                  <strong>Status:</strong> {viewScan.status}
-                </p>
-                {viewScan.matchedSections.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="font-medium">Matches:</p>
-                    {viewScan.matchedSections.map((m, i) => (
-                      <div key={i} className="rounded border bg-muted/30 p-2 text-xs">
-                        <p className="text-destructive">{m.similarity}% — {m.source}</p>
-                        <p className="mt-1 italic">{m.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <Button className="w-full gap-2" onClick={() => downloadScanReport(viewScan)}>
-                  <Download className="h-4 w-4" />
-                  Download report
-                </Button>
-              </div>
-            </>
-          )}
+      <Dialog open={!!editingDoc} onOpenChange={(open) => !open && setEditingDoc(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Document</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Replace File</label>
+              <input ref={editFileRef} type="file" accept=".pdf,.doc,.docx,.txt" className="hidden"
+                onChange={(e) => { setEditFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+              <Button variant="outline" className="w-full" onClick={() => editFileRef.current?.click()}>
+                {editFile ? editFile.name : "Choose file"}
+              </Button>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button className="flex-1" onClick={handleEdit} disabled={editLoading || !editFile}>
+                {editLoading ? "Saving…" : "Save Changes"}
+              </Button>
+              <Button variant="outline" onClick={() => setEditingDoc(null)}>Cancel</Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Document</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Are you sure you want to delete this document? This action cannot be undone.</p>
+          <div className="flex gap-2 pt-2">
+            <Button variant="destructive" className="flex-1" onClick={handleDelete} disabled={deleteLoading}>
+              {deleteLoading ? "Deleting…" : "Delete"}
+            </Button>
+            <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </DashboardLayout>
   );
 };

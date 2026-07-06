@@ -5,8 +5,21 @@ const KEYS = {
   users: "aps_users",
   session: "aps_session",
   loggedIn: "aps_logged_in",
+  token: "aps_token",
   settings: (userId: string) => `aps_settings_${userId}`,
 };
+
+export function getToken(): string | null {
+  return localStorage.getItem(KEYS.token);
+}
+
+export function setToken(token: string) {
+  localStorage.setItem(KEYS.token, token);
+}
+
+export function clearToken() {
+  localStorage.removeItem(KEYS.token);
+}
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -24,7 +37,7 @@ function write(key: string, value: unknown) {
 
 // ——— Auth ———
 export function isLoggedIn(): boolean {
-  return !!localStorage.getItem(KEYS.loggedIn) && !!getSession();
+  return !!getToken() && !!getSession();
 }
 
 export function getSession(): AuthSession | null {
@@ -39,12 +52,23 @@ export function setSession(session: AuthSession) {
 export function clearSession() {
   localStorage.removeItem(KEYS.session);
   localStorage.removeItem(KEYS.loggedIn);
+  clearToken();
 }
 
 export function getCurrentUser(): UserAccount | null {
   const session = getSession();
   if (!session) return null;
-  return getUsers().find((u) => u.id === session.userId) ?? null;
+  const local = getUsers().find((u) => u.id === session.userId);
+  if (local) return local;
+  // API user — reconstruct a minimal UserAccount from session
+  return {
+    id: session.userId,
+    email: session.email,
+    password: "",
+    fullName: session.fullName,
+    role: session.role,
+    createdAt: "",
+  };
 }
 
 // ——— Users ———
@@ -143,42 +167,14 @@ export function registerUser(data: {
 }): { ok: boolean; error?: string } {
   const result = createUser(data);
   if (!result.ok || !result.user) return { ok: false, error: result.error };
-  setSession({ userId: result.user.id, email: result.user.email });
+  setSession({ userId: result.user.id, email: result.user.email, role: result.user.role, fullName: result.user.fullName });
   return { ok: true };
 }
 
 export function loginUser(email: string, password: string): { ok: boolean; error?: string } {
-  let user = getUsers().find(
-    (u) => u.email === email.trim().toLowerCase()
-  );
-
-  if (!user) {
-    const emailLower = email.trim().toLowerCase();
-    let role: UserRole = "student";
-    let fullName = "Demo Student";
-
-    if (emailLower.includes("admin")) {
-      role = "admin";
-      fullName = "Demo Admin";
-    } else if (emailLower.includes("lecturer") || emailLower.includes("teacher") || emailLower.includes("prof")) {
-      role = "lecturer";
-      fullName = "Demo Lecturer";
-    }
-
-    const result = createUser({
-      email: emailLower,
-      password: password || "password123",
-      fullName,
-      role,
-    });
-
-    if (!result.ok || !result.user) {
-      return { ok: false, error: result.error || "Login failed" };
-    }
-    user = result.user;
-  }
-
-  setSession({ userId: user.id, email: user.email });
+  const user = getUsers().find((u) => u.email === email.trim().toLowerCase() && u.password === password);
+  if (!user) return { ok: false, error: "Invalid email or password" };
+  setSession({ userId: user.id, email: user.email, role: user.role, fullName: user.fullName });
   return { ok: true };
 }
 

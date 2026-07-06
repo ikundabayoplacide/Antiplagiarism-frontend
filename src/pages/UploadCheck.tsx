@@ -1,49 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import {
-  Upload,
-  Search,
-  Download,
-  Trash2,
-  Loader2,
-  FileText,
-  AlertTriangle,
-  CheckCircle,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { ngramPlagiarismPercent, findNgramMatches, REFERENCE_CORPUS } from "@/lib/ngram";
-import {
-  getSession,
-  getSimilarityThreshold,
-  saveScan,
-  getScansForCurrentUser,
-  deleteScan,
-} from "@/lib/storage";
-import { downloadScanReport } from "@/lib/report";
-import type { ScanRecord } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Upload, Search, Trash2, Loader2, Pencil } from "lucide-react";
+import { apiUploadDocument, apiGetDocuments, apiGetDocument, apiDeleteDocument, apiUpdateDocument, type ApiDocument } from "@/lib/api";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-
-async function readFileAsText(file: File): Promise<string> {
-  if (file.type === "text/plain" || file.name.endsWith(".txt")) {
-    return file.text();
-  }
-  // Fallback text extraction simulation for PDF/DOCX files
-  return `
-    ${file.name} extracted content for N-gram analysis.
-    Machine learning is a subset of artificial intelligence that provides systems
-    the ability to automatically learn and improve from experience.
-    Academic integrity requires students to submit work that reflects their own understanding and effort.
-    The algorithm iterates through the dataset multiple times adjusting weights based on the error gradient.
-  `;
-}
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 // Custom date formatter to output exactly "May 25th, 7:12 PM" layout
 const formatUploadDate = (dateStr: string) => {
@@ -72,99 +35,108 @@ const formatUploadDate = (dateStr: string) => {
 };
 
 const UploadCheck = () => {
-  const [documents, setDocuments] = useState<ScanRecord[]>([]);
+  const [documents, setDocuments] = useState<ApiDocument[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzingFileName, setAnalyzingFileName] = useState("");
   const [progress, setProgress] = useState(0);
-  const [viewingScan, setViewingScan] = useState<ScanRecord | null>(null);
+  const [editingDoc, setEditingDoc] = useState<ApiDocument | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const editFileRef = useRef<HTMLInputElement>(null);
 
-  const threshold = getSimilarityThreshold();
+  const loadDocuments = async () => {
+    try {
+      const docs = await apiGetDocuments();
+      setDocuments(docs);
+    } catch {
+      toast.error("Failed to load documents.");
+    }
+  };
 
-  // Load user scans on component mount
-  useEffect(() => {
-    setDocuments(getScansForCurrentUser());
-  }, []);
+  useEffect(() => { loadDocuments(); }, []);
 
   const handleUpload = async (f: File) => {
     setAnalyzingFileName(f.name);
     setIsAnalyzing(true);
     setProgress(0);
-
-    // Simulate analysis steps progress bar
-    const timer = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 90) return 90;
-        return p + 10;
-      });
-    }, 120);
-
+    const timer = setInterval(() => setProgress((p) => p >= 90 ? 90 : p + 10), 120);
     try {
-      const text = await readFileAsText(f);
-      const words = text.split(/\s+/).filter(Boolean).length;
-      const plagiarismPercent = ngramPlagiarismPercent(text, REFERENCE_CORPUS, 3);
-      
-      setProgress(100);
+      await apiUploadDocument(f);
       clearInterval(timer);
-      
-      // Delay slightly for presentation of completion
+      setProgress(100);
       setTimeout(() => {
-        const session = getSession();
-        if (!session) {
-          setIsAnalyzing(false);
-          toast.error("User session not found. Please log in.");
-          return;
-        }
-
-        const matches = findNgramMatches(text);
-        const originalPercent = 100 - plagiarismPercent;
-        const status = plagiarismPercent >= threshold ? "flagged" : "original";
-
-        const scan: ScanRecord = {
-          id: crypto.randomUUID(),
-          userId: session.userId,
-          fileName: f.name,
-          fileSize: f.size,
-          fileType: f.type || "application/octet-stream",
-          plagiarismPercent,
-          originalPercent,
-          wordCount: words,
-          status,
-          matchedSections: matches,
-          createdAt: new Date().toISOString(),
-        };
-
-        saveScan(scan);
-        
-        // Refresh local documents list
-        const updatedDocs = getScansForCurrentUser();
-        setDocuments(updatedDocs);
         setIsAnalyzing(false);
-
-        // Notify user
-        if (status === "flagged" && plagiarismPercent >= threshold) {
-          toast.warning(`Analysis complete: Plagiarism ${plagiarismPercent}% exceeds threshold (${threshold}%)`);
-        } else {
-          toast.success("Document uploaded and scanned successfully!");
-        }
-
-        // Auto-open results preview modal
-        setViewingScan(scan);
+        toast.success("Document uploaded successfully!");
+        loadDocuments();
       }, 500);
-
-    } catch (err) {
+    } catch (err: unknown) {
       clearInterval(timer);
       setIsAnalyzing(false);
-      toast.error("An error occurred during document parsing.");
+      toast.error(err instanceof Error ? err.message : "Upload failed.");
     }
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
-    deleteScan(id);
-    setDocuments(getScansForCurrentUser());
-    toast.success("Document removed.");
-    if (viewingScan?.id === id) setViewingScan(null);
+  const handleView = async (doc: ApiDocument) => {
+    try {
+      const full = await apiGetDocument(doc.id);
+      if (!full.content) { toast.error("No content available."); return; }
+      const byteChars = atob(full.content);
+      const bytes = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([bytes], { type: full.fileType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.fileName ?? doc.id;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to download document.");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingId) return;
+    setDeleteLoading(true);
+    try {
+      await apiDeleteDocument(deletingId);
+      toast.success("Document deleted.");
+      setDeletingId(null);
+      loadDocuments();
+    } catch {
+      toast.error("Failed to delete document.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const openEdit = (doc: ApiDocument) => {
+    setEditingDoc(doc);
+    setEditName(doc.fileName ?? "");
+    setEditFile(null);
+  };
+
+  const handleEdit = async () => {
+    if (!editingDoc) return;
+    if (!editName.trim() && !editFile) { toast.error("Provide a new name or file."); return; }
+    setEditLoading(true);
+    try {
+      await apiUpdateDocument(editingDoc.id, {
+        ...(editFile ? { file: editFile } : {}),
+        ...(editName.trim() ? { fileName: editName.trim() } : {}),
+      });
+      toast.success("Document updated.");
+      setEditingDoc(null);
+      loadDocuments();
+    } catch {
+      toast.error("Failed to update document.");
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   return (
@@ -185,7 +157,12 @@ const UploadCheck = () => {
             type="file"
             accept=".pdf,.doc,.docx,.txt"
             className="hidden"
-            onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+            onChange={(e) => {
+              if (e.target.files?.[0]) {
+                handleUpload(e.target.files[0]);
+                e.target.value = "";
+              }
+            }}
           />
         </div>
 
@@ -204,49 +181,42 @@ const UploadCheck = () => {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="pb-3 text-left text-sm font-bold text-foreground w-1/2">
-                      File name
-                    </th>
-                    <th className="pb-3 text-left text-sm font-bold text-foreground w-1/4">
-                      Upload Date
-                    </th>
-                    <th className="pb-3 text-right text-sm font-bold text-foreground">
-                      {/* Actions Header spacer */}
-                    </th>
+                    <th className="pb-3 text-left text-sm font-bold text-foreground w-1/2">File name</th>
+                    <th className="pb-3 text-left text-sm font-bold text-foreground w-1/4">Upload Date</th>
+                    <th className="pb-3 text-left text-sm font-bold text-foreground">Size</th>
+                    <th className="pb-3 text-right text-sm font-bold text-foreground"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
                   {documents.map((doc) => (
-                    <tr
-                      key={doc.id}
-                      className="group transition-colors hover:bg-muted/30"
-                    >
+                    <tr key={doc.id} className="group transition-colors hover:bg-muted/30">
                       <td className="py-4 text-sm font-medium text-foreground pr-4">
-                        {doc.fileName}
+                        {doc.fileName ?? doc.id}
                       </td>
                       <td className="py-4 text-sm text-muted-foreground font-medium">
                         {formatUploadDate(doc.createdAt)}
                       </td>
+                      <td className="py-4 text-sm text-muted-foreground">
+                        {(doc.fileSize / 1024).toFixed(1)} KB
+                      </td>
                       <td className="py-4 text-right">
                         <div className="flex justify-end items-center gap-2">
                           <button
-                            onClick={() => setViewingScan(doc)}
+                            onClick={() => openEdit(doc)}
+                            className="border border-border text-foreground hover:bg-muted rounded-lg px-3 py-1.5 flex items-center gap-1.5 text-xs font-semibold transition-colors"
+                          >
+                            <Pencil className="h-3.5 w-3.5 stroke-[2.5]" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleView(doc)}
                             className="bg-[#22c55e] hover:bg-[#16a34a] text-white rounded-lg px-3 py-1.5 flex items-center gap-1.5 text-xs font-semibold shadow-sm transition-colors"
                           >
                             <Search className="h-3.5 w-3.5 stroke-[2.5]" />
-                            View Results
+                            View
                           </button>
-                          
                           <button
-                            onClick={() => downloadScanReport(doc)}
-                            className="border border-[#2563eb] text-[#2563eb] hover:bg-blue-50/50 rounded-lg px-3 py-1.5 flex items-center gap-1.5 text-xs font-semibold transition-colors"
-                          >
-                            <Download className="h-3.5 w-3.5 stroke-[2.5]" />
-                            Download
-                          </button>
-                          
-                          <button
-                            onClick={() => handleDelete(doc.id, doc.fileName)}
+                            onClick={() => setDeletingId(doc.id)}
                             className="border border-destructive text-destructive hover:bg-destructive/5 rounded-lg px-3 py-1.5 flex items-center gap-1.5 text-xs font-semibold transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5 stroke-[2.5]" />
@@ -283,131 +253,58 @@ const UploadCheck = () => {
         </Dialog>
       )}
 
-      {/* Detailed Similarity Results Dialog Modal */}
-      <Dialog open={!!viewingScan} onOpenChange={(open) => !open && setViewingScan(null)}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto rounded-2xl p-6">
-          {viewingScan && (
-            <>
-              <DialogHeader className="border-b border-border pb-4 mb-4">
-                <DialogTitle className="font-heading text-xl font-bold flex items-center gap-2 text-foreground truncate">
-                  <FileText className="h-5.5 w-5.5 text-primary" />
-                  {viewingScan.fileName}
-                </DialogTitle>
-              </DialogHeader>
-              
-              <div className="space-y-6">
-                {/* Score Summary Metrics */}
-                <div className="grid grid-cols-3 gap-4 rounded-xl bg-muted/40 p-4 border border-border">
-                  <div className="text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Plagiarism</p>
-                    <p
-                      className={cn(
-                        "font-heading text-4xl font-extrabold mt-1",
-                        viewingScan.plagiarismPercent >= threshold
-                          ? "text-destructive"
-                          : viewingScan.plagiarismPercent > 20
-                            ? "text-yellow-600"
-                            : "text-success"
-                      )}
-                    >
-                      {viewingScan.plagiarismPercent}%
-                    </p>
-                  </div>
-                  <div className="text-center border-x border-border/80">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Originality</p>
-                    <p className="font-heading text-4xl font-extrabold text-foreground mt-1">
-                      {viewingScan.originalPercent}%
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Word Count</p>
-                    <p className="font-heading text-4xl font-extrabold text-foreground mt-1">
-                      {viewingScan.wordCount}
-                    </p>
-                  </div>
-                </div>
 
-                {/* Status Alert Banner */}
-                <div
-                  className={cn(
-                    "rounded-xl border p-4 flex items-start gap-3",
-                    viewingScan.status === "flagged"
-                      ? "border-destructive/20 bg-destructive/5 text-destructive"
-                      : "border-success/20 bg-success/5 text-success"
-                  )}
-                >
-                  {viewingScan.status === "flagged" ? (
-                    <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
-                  ) : (
-                    <CheckCircle className="h-5 w-5 shrink-0 mt-0.5" />
-                  )}
-                  <div>
-                    <h4 className="font-semibold text-sm">
-                      {viewingScan.status === "flagged"
-                        ? "Similarity Alert Flagged"
-                        : "High Document Originality"}
-                    </h4>
-                    <p className="text-xs opacity-90 mt-0.5 leading-relaxed font-medium">
-                      {viewingScan.status === "flagged"
-                        ? `This document similarity score of ${viewingScan.plagiarismPercent}% exceeds the plagiarism threshold of ${threshold}%. Matched passages are highlighted below.`
-                        : `This document is within safe plagiarism similarity limits (below ${threshold}%).`}
-                    </p>
-                  </div>
-                </div>
+      <Dialog open={!!deletingId} onOpenChange={(open) => !open && setDeletingId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Document</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Are you sure you want to delete this document? This action cannot be undone.</p>
+          <div className="flex gap-2 pt-2">
+            <Button variant="destructive" className="flex-1" onClick={handleDelete} disabled={deleteLoading}>
+              {deleteLoading ? "Deleting…" : "Delete"}
+            </Button>
+            <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-                {/* Matched Passages List */}
-                <div className="space-y-3">
-                  <h4 className="font-heading text-sm font-bold text-foreground flex items-center gap-2">
-                    Matched Passages ({viewingScan.matchedSections.length})
-                  </h4>
-                  <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-                    {viewingScan.matchedSections.length === 0 ? (
-                      <p className="text-xs text-muted-foreground py-4 text-center">
-                        No significant matches detected in the reference database.
-                      </p>
-                    ) : (
-                      viewingScan.matchedSections.map((section, i) => (
-                        <div
-                          key={i}
-                          className="rounded-xl border border-destructive/15 bg-destructive/[0.02] p-4 space-y-2 hover:bg-destructive/[0.04] transition-colors"
-                        >
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-bold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
-                              {section.similarity}% match
-                            </span>
-                            <span className="font-medium text-muted-foreground">
-                              Source: {section.source}
-                            </span>
-                          </div>
-                          <p className="text-xs italic text-foreground/80 leading-relaxed font-serif">
-                            "{section.text}"
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Action buttons footer */}
-                <div className="flex items-center gap-3 border-t border-border pt-4 mt-6">
-                  <Button
-                    onClick={() => downloadScanReport(viewingScan)}
-                    className="flex-1 gap-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download PDF Report
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setViewingScan(null)}
-                    className="rounded-xl"
-                  >
-                    Close
-                  </Button>
-                </div>
+      <Dialog open={!!editingDoc} onOpenChange={(open) => !open && setEditingDoc(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Document</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">File Name</label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Enter new file name"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Replace File <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={editFileRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt"
+                  className="hidden"
+                  onChange={(e) => { setEditFile(e.target.files?.[0] ?? null); e.target.value = ""; }}
+                />
+                <Button variant="outline" className="w-full" onClick={() => editFileRef.current?.click()}>
+                  {editFile ? editFile.name : "Choose file"}
+                </Button>
               </div>
-            </>
-          )}
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button className="flex-1" onClick={handleEdit} disabled={editLoading}>
+                {editLoading ? "Saving…" : "Save Changes"}
+              </Button>
+              <Button variant="outline" onClick={() => setEditingDoc(null)}>Cancel</Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </DashboardLayout>

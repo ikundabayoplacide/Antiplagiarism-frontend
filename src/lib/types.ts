@@ -41,4 +41,6 @@ export interface AppSettings {
 export interface AuthSession {
   userId: string;
   email: string;
+  role: UserRole;
+  fullName: string;
 }

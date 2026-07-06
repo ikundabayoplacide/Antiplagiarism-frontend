@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Mail, User, ArrowRight, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import MarketingLayout from "@/components/MarketingLayout";
-import { registerUser } from "@/lib/storage";
+import { setSession, setToken } from "@/lib/storage";
+import { apiRegister, ApiError } from "@/lib/api";
 import type { UserRole } from "@/lib/types";
 
 const Register = () => {
@@ -19,6 +20,7 @@ const Register = () => {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("student");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ fullName?: string; email?: string; password?: string; role?: string }>({});
 
   return (
     <MarketingLayout>
@@ -43,26 +45,30 @@ const Register = () => {
             <CardContent className="pt-6">
               <form
                 className="space-y-4"
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
+                  setErrors({});
                   if (password.length < 6) {
-                    toast.error("Password must be at least 6 characters");
+                    setErrors({ password: "Password must be at least 6 characters" });
                     return;
                   }
                   setLoading(true);
-                  const result = registerUser({ email, password, fullName, role });
-                  setLoading(false);
-                  if (!result.ok) {
-                    toast.error(result.error);
-                    return;
-                  }
-                  toast.success("Account created");
-                  if (role === "admin") {
-                    navigate("/admin");
-                  } else if (role === "lecturer") {
-                    navigate("/lecturer");
-                  } else {
-                    navigate("/dashboard");
+                  try {
+                    const { token, user } = await apiRegister({ fullName, email, password, role });
+                    setToken(token);
+                    setSession({ userId: String(user.id), email: user.email, role: user.role, fullName: user.fullName });
+                    toast.success("Account created");
+                    if (user.role === "admin") navigate("/admin");
+                    else if (user.role === "lecturer") navigate("/lecturer");
+                    else navigate("/dashboard");
+                  } catch (err: unknown) {
+                    if (err instanceof ApiError && err.field) {
+                      setErrors({ [err.field]: err.message });
+                    } else {
+                      toast.error(err instanceof Error ? err.message : "Registration failed");
+                    }
+                  } finally {
+                    setLoading(false);
                   }
                 }}
               >
@@ -74,11 +80,12 @@ const Register = () => {
                       id="name"
                       required
                       value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      onChange={(e) => { setFullName(e.target.value); setErrors((p) => ({ ...p, fullName: undefined })); }}
                       placeholder="John Doe"
-                      className="pl-10"
+                      className={`pl-10 ${errors.fullName ? "border-destructive" : ""}`}
                     />
                   </div>
+                  {errors.fullName && <p className="text-xs text-destructive">{errors.fullName}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -89,16 +96,17 @@ const Register = () => {
                       type="email"
                       required
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: undefined })); }}
                       placeholder="you@university.edu"
-                      className="pl-10"
+                      className={`pl-10 ${errors.email ? "border-destructive" : ""}`}
                     />
                   </div>
+                  {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Role</Label>
-                  <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
-                    <SelectTrigger>
+                  <Select value={role} onValueChange={(v) => { setRole(v as UserRole); setErrors((p) => ({ ...p, role: undefined })); }}>
+                    <SelectTrigger className={errors.role ? "border-destructive" : ""}>
                       <SelectValue placeholder="Select your role" />
                     </SelectTrigger>
                     <SelectContent>
@@ -107,6 +115,7 @@ const Register = () => {
                       <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
+                  {errors.role && <p className="text-xs text-destructive">{errors.role}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
@@ -116,9 +125,11 @@ const Register = () => {
                     required
                     minLength={6}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: undefined })); }}
                     placeholder="••••••••"
+                    className={errors.password ? "border-destructive" : ""}
                   />
+                  {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
                 </div>
                 <Button type="submit" className="w-full gap-2" disabled={loading}>
                   {loading ? "Creating…" : "Create Account"}

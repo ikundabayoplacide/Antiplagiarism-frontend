@@ -51,7 +51,7 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
       <TooltipProvider>
         <Toaster />
-        <Sonner />
+        <Sonner position="top-right" richColors />
         <BrowserRouter>
           <ScrollToTop />
           <Routes>

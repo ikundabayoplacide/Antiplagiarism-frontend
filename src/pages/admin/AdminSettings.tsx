@@ -41,13 +41,10 @@ const AdminSettings = () => {
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>First Name</Label>
+                <Label>Full Name</Label>
                 <Input value={settings.firstName} onChange={(e) => update("firstName", e.target.value)} />
               </div>
-              <div className="space-y-2">
-                <Label>Last Name</Label>
-                <Input value={settings.lastName} onChange={(e) => update("lastName", e.target.value)} />
-              </div>
+            
             </div>
             <div className="space-y-2">
               <Label>Email</Label>
