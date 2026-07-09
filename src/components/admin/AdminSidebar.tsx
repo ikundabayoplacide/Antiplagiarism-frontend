@@ -7,6 +7,8 @@ import {
   HiOutlineUsers,
   HiOutlineViewGrid,
   HiOutlineCog,
+  HiOutlineAcademicCap,
+  HiOutlineUserGroup,
 } from "react-icons/hi";
 import type { IconType } from "react-icons";
 import logo from "@/assets/logo.png";
@@ -16,6 +18,8 @@ import { clearSession } from "@/lib/storage";
 const navItems: { icon: IconType; label: string; path: string }[] = [
   { icon: HiOutlineViewGrid, label: "Dashboard", path: "/admin" },
   { icon: HiOutlineUsers, label: "Users Management", path: "/admin/users" },
+  { icon: HiOutlineAcademicCap, label: "Students", path: "/admin/students" },
+  { icon: HiOutlineUserGroup, label: "Lecturers", path: "/admin/lecturers" },
   { icon: HiOutlineDocumentDuplicate, label: "Documents", path: "/admin/documents" },
   { icon: HiOutlineDocumentReport, label: "Plagiarism Reports", path: "/admin/reports" },
   { icon: HiOutlineSearchCircle, label: "Similarity Results", path: "/admin/similarity" },

@@ -37,7 +37,14 @@ function write(key: string, value: unknown) {
 
 // ——— Auth ———
 export function isLoggedIn(): boolean {
-  return !!getToken() && !!getSession();
+  const token = getToken();
+  const session = getSession();
+  if (!token || !session) {
+    // clean up any stale flags
+    localStorage.removeItem(KEYS.loggedIn);
+    return false;
+  }
+  return true;
 }
 
 export function getSession(): AuthSession | null {
@@ -142,6 +149,7 @@ export function createUser(data: {
   password: string;
   fullName: string;
   role: UserRole;
+  department?: string;
 }): { ok: boolean; error?: string; user?: UserAccount } {
   const users = getUsers();
   if (users.some((u) => u.email.toLowerCase() === data.email.trim().toLowerCase())) {
@@ -153,6 +161,7 @@ export function createUser(data: {
     password: data.password,
     fullName: data.fullName.trim(),
     role: data.role,
+    ...(data.department && { department: data.department.trim() }),
     createdAt: new Date().toISOString(),
   };
   saveUsers([...users, user]);
@@ -164,6 +173,7 @@ export function registerUser(data: {
   password: string;
   fullName: string;
   role: UserRole;
+  department?: string;
 }): { ok: boolean; error?: string } {
   const result = createUser(data);
   if (!result.ok || !result.user) return { ok: false, error: result.error };

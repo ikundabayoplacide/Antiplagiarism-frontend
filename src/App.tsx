@@ -32,6 +32,8 @@ import AdminDocuments from "./pages/admin/AdminDocuments";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminSimilarity from "./pages/admin/AdminSimilarity";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminStudents from "./pages/admin/AdminStudents";
+import AdminLecturers from "./pages/admin/AdminLecturers";
 
 // Lecturer Imports
 import LecturerRoute from "./components/lecturer/LecturerRoute";
@@ -78,6 +80,8 @@ const App = () => (
             {/* Admin Dashboard Routes */}
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+            <Route path="/admin/students" element={<AdminRoute><AdminStudents /></AdminRoute>} />
+            <Route path="/admin/lecturers" element={<AdminRoute><AdminLecturers /></AdminRoute>} />
             <Route path="/admin/documents" element={<AdminRoute><AdminDocuments /></AdminRoute>} />
             <Route path="/admin/reports" element={<AdminRoute><AdminReports /></AdminRoute>} />
             <Route path="/admin/similarity" element={<AdminRoute><AdminSimilarity /></AdminRoute>} />

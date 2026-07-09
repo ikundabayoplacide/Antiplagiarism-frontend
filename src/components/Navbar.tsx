@@ -20,7 +20,7 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [loggedIn, setLoggedIn] = useState(isLoggedIn);
+  const [loggedIn, setLoggedIn] = useState(() => isLoggedIn());
   const currentUser = loggedIn ? getCurrentUser() : null;
   const dashboardPath =
     currentUser?.role === "admin"
@@ -84,7 +84,7 @@ const Navbar = () => {
               </Button>
             </>
           ) : (
-            <Link to="/register">
+            <Link to="/login">
               <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
                 Get Started
               </Button>

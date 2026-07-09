@@ -14,11 +14,13 @@ api.interceptors.request.use((config) => {
 });
 
 export interface ApiUser {
-  id: number;
+  id: string;
   fullName: string;
   email: string;
   role: UserRole;
+  department?: string;
   phoneNumber?: string;
+  createdAt: string;
 }
 
 export interface LoginResponse {
@@ -57,6 +59,7 @@ export async function apiRegister(payload: {
   password: string;
   role: UserRole;
   phoneNumber?: string;
+  department?: string;
 }): Promise<LoginResponse> {
   try {
     const { data } = await api.post<LoginResponse>("/auth/register", payload);
@@ -98,6 +101,15 @@ export async function apiUploadDocument(file: File): Promise<ApiDocument> {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return { ...data, fileName: data.fileName ?? file.name };
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiGetUsers(): Promise<ApiUser[]> {
+  try {
+    const { data } = await api.get<ApiUser[]>("/admin/users");
+    return data;
   } catch (err) {
     toApiError(err);
   }
@@ -146,7 +158,98 @@ export async function apiUpdateDocument(id: string, payload: { file?: File; file
   }
 }
 
+// ——— Assignments ———
+export interface LecturerProject {
+  id: string;
+  title: string;
+  studentName: string;
+  studentId: string;
+  studentEmail: string;
+  dateSubmitted: string;
+  similarityPercent: number;
+  wordCount: number;
+  status: "Low" | "Medium" | "High";
+}
+
+export async function apiGetLecturerProjects(): Promise<LecturerProject[]> {
+  try {
+    const { data } = await api.get<LecturerProject[]>("/lecturer/my-students/projects");
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiGetLecturerStudents(): Promise<ApiUser[]> {
+  try {
+    const { data } = await api.get<ApiUser[]>("/lecturer/students");
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export interface ApiAssignment {
+  id: string;
+  lecturerId: string;
+  studentId: string;
+  lecturer?: ApiUser;
+  student?: ApiUser;
+  createdAt: string;
+}
+
+export async function apiGetAssignments(): Promise<ApiAssignment[]> {
+  try {
+    const { data } = await api.get<ApiAssignment[]>("/admin/assignments");
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiAssignStudent(lecturerId: string, studentId: string): Promise<ApiAssignment> {
+  try {
+    const { data } = await api.post<ApiAssignment>("/admin/assignments", { lecturerId, studentId });
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiUnassignStudent(assignmentId: string): Promise<void> {
+  try {
+    await api.delete(`/admin/assignments/${assignmentId}`);
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiGetAssignmentsByLecturer(lecturerId: string): Promise<ApiAssignment[]> {
+  try {
+    const { data } = await api.get<ApiAssignment[]>(`/admin/assignments/lecturer/${lecturerId}`);
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
 // ——— Settings ———
+export async function apiUpdateProfile(payload: { fullName?: string; email?: string }): Promise<void> {
+  try {
+    await api.put("/settings/profile", payload);
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiChangePassword(currentPassword: string, newPassword: string): Promise<void> {
+  try {
+    await api.put("/settings/change-password", { currentPassword, newPassword });
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
 export interface ApiSettings {
   fullName: string;
   email: string;

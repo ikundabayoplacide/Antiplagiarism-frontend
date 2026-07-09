@@ -5,7 +5,6 @@ import {
   FaFileShield,
   FaTriangleExclamation,
   FaUserGraduate,
-  FaDownload,
   FaCircleUser,
   FaArrowRightFromBracket,
 } from "react-icons/fa6";
@@ -24,11 +23,10 @@ interface SidebarItem {
 
 const navItems: SidebarItem[] = [
   { icon: FaChartPie, label: "Dashboard", path: "/lecturer" },
-  { icon: FaBookOpen, label: "Student Projects", path: "/lecturer/projects" },
   { icon: FaFileShield, label: "Plagiarism Reports", path: "/lecturer/reports" },
   { icon: FaTriangleExclamation, label: "High Similarity Alerts", path: "/lecturer/alerts" },
   { icon: FaUserGraduate, label: "My Students", path: "/lecturer/students" },
-  { icon: FaDownload, label: "Downloads", path: "/lecturer/downloads" },
+  { icon: FaBookOpen, label: "Student Projects", path: "/lecturer/projects" },
   { icon: FaCircleUser, label: "Profile", path: "/lecturer/profile" },
 ];
 

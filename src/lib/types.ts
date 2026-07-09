@@ -26,6 +26,7 @@ export interface UserAccount {
   password: string;
   fullName: string;
   role: UserRole;
+  department?: string;
   createdAt: string;
 }
 

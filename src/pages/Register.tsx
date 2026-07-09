@@ -19,8 +19,9 @@ const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("student");
+  const [department, setDepartment] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ fullName?: string; email?: string; password?: string; role?: string }>({});
+  const [errors, setErrors] = useState<{ fullName?: string; email?: string; password?: string; role?: string; department?: string }>({});
 
   return (
     <MarketingLayout>
@@ -52,9 +53,13 @@ const Register = () => {
                     setErrors({ password: "Password must be at least 6 characters" });
                     return;
                   }
+                  if (role === "student" && !department.trim()) {
+                    setErrors({ department: "Department is required for students" });
+                    return;
+                  }
                   setLoading(true);
                   try {
-                    const { token, user } = await apiRegister({ fullName, email, password, role });
+                    const { token, user } = await apiRegister({ fullName, email, password, role, ...(role === "student" && { department }) });
                     setToken(token);
                     setSession({ userId: String(user.id), email: user.email, role: user.role, fullName: user.fullName });
                     toast.success("Account created");
@@ -117,6 +122,20 @@ const Register = () => {
                   </Select>
                   {errors.role && <p className="text-xs text-destructive">{errors.role}</p>}
                 </div>
+                {role === "student" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Department</Label>
+                    <Input
+                      id="department"
+                      required
+                      value={department}
+                      onChange={(e) => { setDepartment(e.target.value); setErrors((p) => ({ ...p, department: undefined })); }}
+                      placeholder="e.g. Computer Science"
+                      className={errors.department ? "border-destructive" : ""}
+                    />
+                    {errors.department && <p className="text-xs text-destructive">{errors.department}</p>}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <PasswordInput
