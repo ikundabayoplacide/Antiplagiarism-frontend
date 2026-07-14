@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FaUserGraduate, FaBookOpen, FaFileShield, FaTriangleExclamation,
   FaArrowTrendUp, FaArrowTrendDown,
@@ -28,6 +29,7 @@ const LecturerDashboardPage = () => {
   const [scans, setScans] = useState<ApiScan[]>([]);
   const [students, setStudents] = useState<ApiUser[]>([]);
   const [viewScan, setViewScan] = useState<ApiScan | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     apiGetLecturerScans().then(setScans).catch(() => {});
@@ -62,25 +64,16 @@ const LecturerDashboardPage = () => {
   return (
     <div className="space-y-8 pb-10">
       {/* Greeting Banner */}
-      <div className="rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 md:p-8 text-white shadow-lg relative overflow-hidden">
-        <div className="absolute right-0 top-0 h-40 w-40 bg-white/5 rounded-full blur-2xl -translate-y-12 translate-x-12" />
-        <div className="relative z-10 space-y-2">
-          <h2 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight">Lecturer Dashboard</h2>
-          <p className="text-white/80 text-sm md:text-base max-w-xl font-medium">
-            Supervise student research projects, review plagiarism reports, and monitor high-similarity alerts.
-          </p>
-        </div>
-      </div>
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Supervised Students", value: students.length, icon: FaUserGraduate, color: "blue" },
-          { label: "Submitted Projects", value: scans.length, icon: FaBookOpen, color: "indigo" },
-          { label: "Reports Generated", value: scans.length, icon: FaFileShield, color: "purple" },
-          { label: "High Similarity", value: highAlerts.length, icon: FaTriangleExclamation, color: "rose" },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label} className="border-border/60 shadow-sm rounded-2xl overflow-hidden relative group transition-all duration-300 hover:shadow-md hover:-translate-y-1">
+          { label: "Supervised Students", value: students.length, icon: FaUserGraduate, color: "blue", to: "/lecturer/students" },
+          { label: "Submitted Projects", value: scans.length, icon: FaBookOpen, color: "indigo", to: "/lecturer/projects" },
+          { label: "Reports Generated", value: scans.length, icon: FaFileShield, color: "purple", to: "/lecturer/reports" },
+          { label: "High Similarity", value: highAlerts.length, icon: FaTriangleExclamation, color: "rose", to: "/lecturer/alerts" },
+        ].map(({ label, value, icon: Icon, color, to }) => (
+          <Card key={label} onClick={() => navigate(to)} className="border-border/60 shadow-sm rounded-2xl overflow-hidden relative group transition-all duration-300 hover:shadow-md hover:-translate-y-1 cursor-pointer">
             <div className={`absolute inset-x-0 bottom-0 h-1 bg-${color}-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300`} />
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{label}</CardTitle>

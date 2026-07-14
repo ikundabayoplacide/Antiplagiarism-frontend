@@ -49,6 +49,9 @@ const ManageUsers = () => {
   const [search, setSearch] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [open, setOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingName, setDeletingName] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -82,13 +85,12 @@ const ManageUsers = () => {
     setRefresh((r) => r + 1);
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (id === currentUser?.id) {
-      toast.error("You cannot delete your own account");
-      return;
-    }
-    if (!confirm(`Delete user "${name}"?`)) return;
-    deleteUser(id);
+  const handleDelete = () => {
+    if (!deletingId) return;
+    setDeleteLoading(true);
+    deleteUser(deletingId);
+    setDeletingId(null);
+    setDeleteLoading(false);
     setRefresh((r) => r + 1);
     toast.success("User removed");
   };
@@ -191,7 +193,7 @@ const ManageUsers = () => {
                       variant="ghost"
                       size="sm"
                       disabled={u.id === currentUser?.id}
-                      onClick={() => handleDelete(u.id, u.fullName)}
+                      onClick={() => { setDeletingId(u.id); setDeletingName(u.fullName); }}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -202,6 +204,18 @@ const ManageUsers = () => {
           </table>
         </CardContent>
       </Card>
+      <Dialog open={!!deletingId} onOpenChange={(o) => !o && setDeletingId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Delete User</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Are you sure you want to delete <strong>{deletingName}</strong>? This action cannot be undone.</p>
+          <div className="flex gap-2 pt-2">
+            <Button variant="destructive" className="flex-1" onClick={handleDelete} disabled={deleteLoading}>
+              {deleteLoading ? "Deleting…" : "Delete"}
+            </Button>
+            <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };

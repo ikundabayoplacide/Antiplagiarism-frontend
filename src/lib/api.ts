@@ -204,9 +204,25 @@ export async function apiCreateAdminUser(payload: {
   password: string;
   role: string;
   phoneNumber?: string;
+  department?: string;
 }): Promise<ApiUser> {
   try {
     const { data } = await api.post<ApiUser>("/admin/users", payload);
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiUpdateAdminUser(id: string, payload: {
+  fullName?: string;
+  email?: string;
+  role?: string;
+  phoneNumber?: string;
+  department?: string;
+}): Promise<ApiUser> {
+  try {
+    const { data } = await api.put<ApiUser>(`/admin/users/${id}`, payload);
     return data;
   } catch (err) {
     toApiError(err);
