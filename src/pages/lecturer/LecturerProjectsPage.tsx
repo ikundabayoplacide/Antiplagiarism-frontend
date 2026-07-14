@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { apiGetLecturerProjects, apiGetDocument, type LecturerProject } from "@/lib/api";
+import { apiGetLecturerProjects, type LecturerProject } from "@/lib/api";
 import ProjectDetailsModal from "@/components/lecturer/ProjectDetailsModal";
 import { toast } from "sonner";
 
@@ -38,29 +38,20 @@ const LecturerProjectsPage = () => {
 
   const [downloading, setDownloading] = useState<string | null>(null);
 
-  const handleDownload = async (p: LecturerProject) => {
+  const handleDownload = (p: LecturerProject) => {
     setDownloading(p.id);
-    try {
-      const doc = await apiGetDocument(p.id);
-      if (!doc.content) { toast.error("No file content available."); return; }
-      const byteString = atob(doc.content);
-      const bytes = new Uint8Array(byteString.length);
-      for (let i = 0; i < byteString.length; i++) bytes[i] = byteString.charCodeAt(i);
-      const blob = new Blob([bytes], { type: "application/octet-stream" });
-      const url = URL.createObjectURL(blob);
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = p.title;
-      window.document.body.appendChild(link);
-      link.click();
-      window.document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast.success("Downloaded successfully.");
-    } catch {
-      toast.error("Failed to download file.");
-    } finally {
-      setDownloading(null);
-    }
+    const text = `PLAGIARISM REPORT\n${'='.repeat(40)}\nTitle: ${p.title}\nStudent: ${p.studentName}\nSimilarity: ${p.similarityPercent}%\nStatus: ${p.status}\nSubmitted: ${p.dateSubmitted}\n${'='.repeat(40)}`;
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = window.document.createElement("a");
+    link.href = url;
+    link.download = `${p.title.replace(/\s+/g, "_")}_report.txt`;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Report downloaded.");
+    setDownloading(null);
   };
 
   const filtered = projects.filter((p) =>

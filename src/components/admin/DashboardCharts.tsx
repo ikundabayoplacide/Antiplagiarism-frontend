@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -8,11 +9,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import {
-  getDocumentsPerMonth,
-  getPlagiarismDetectionStats,
-  getUserActivityOverview,
-} from "@/lib/adminData";
+import { apiGetDocumentsPerMonth, apiGetPlagiarismStats, apiGetUserActivity, type ApiChartPoint, type ApiPlagiarismStat, type ApiUserActivity } from "@/lib/api";
 
 const documentsConfig: ChartConfig = {
   value: { label: "Documents", color: "hsl(var(--primary))" },
@@ -31,9 +28,15 @@ const activityConfig: ChartConfig = {
 };
 
 const DashboardCharts = () => {
-  const documentsPerMonth = getDocumentsPerMonth();
-  const plagiarismStats = getPlagiarismDetectionStats();
-  const userActivity = getUserActivityOverview();
+  const [documentsPerMonth, setDocumentsPerMonth] = useState<ApiChartPoint[]>([]);
+  const [plagiarismStats, setPlagiarismStats] = useState<ApiPlagiarismStat[]>([]);
+  const [userActivity, setUserActivity] = useState<ApiUserActivity[]>([]);
+
+  useEffect(() => {
+    apiGetDocumentsPerMonth().then(setDocumentsPerMonth).catch(() => {});
+    apiGetPlagiarismStats().then(setPlagiarismStats).catch(() => {});
+    apiGetUserActivity().then(setUserActivity).catch(() => {});
+  }, []);
 
   return (
     <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">

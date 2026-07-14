@@ -41,7 +41,7 @@ const StatCard = ({
       <div className="mt-4">
         <p className="text-sm font-medium text-muted-foreground">{title}</p>
         <p className="mt-1 font-heading text-3xl font-bold tracking-tight text-foreground">
-          {count.toLocaleString()}
+          {(count ?? 0).toLocaleString()}
         </p>
       </div>
     </CardContent>

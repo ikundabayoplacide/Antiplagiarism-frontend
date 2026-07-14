@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Loader2 } from "lucide-react";
 import { apiGetSettings, apiUpdateSettings, type ApiSettings } from "@/lib/api";
 import { getSession } from "@/lib/storage";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ const SettingsPage = () => {
     similarityThreshold: 30,
   });
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     const session = getSession();
@@ -40,7 +42,8 @@ const SettingsPage = () => {
           }));
         }
         toast.error("Failed to load settings.");
-      });
+      })
+      .finally(() => setPageLoading(false));
   }, []);
 
   const update = <K extends keyof ApiSettings>(key: K, value: ApiSettings[K]) =>
@@ -61,6 +64,12 @@ const SettingsPage = () => {
 
   return (
     <DashboardLayout title="Profile">
+      {pageLoading ? (
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+      <>
       <div className="mb-8">
         <h2 className="font-heading text-2xl font-bold text-foreground">Profile Management</h2>
         <p className="text-sm text-muted-foreground">Manage your account details and scan preferences</p>
@@ -135,6 +144,7 @@ const SettingsPage = () => {
           </CardContent>
         </Card>
       </div>
+      </>)}
     </DashboardLayout>
   );
 };

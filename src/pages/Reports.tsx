@@ -1,33 +1,36 @@
-import { useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, Calendar } from "lucide-react";
-import { getScansForCurrentUser } from "@/lib/storage";
+import { Download, FileText, Calendar, Loader2 } from "lucide-react";
+import { apiGetScans, type ApiScan } from "@/lib/api";
 import { downloadScanReport } from "@/lib/report";
-import { format } from "date-fns";
+import { safeFormat } from "@/lib/utils";
 import { toast } from "sonner";
 
 const Reports = () => {
-  const [refresh] = useState(0);
-  const reports = useMemo(() => {
-    void refresh;
-    return getScansForCurrentUser();
-  }, [refresh]);
+  const [reports, setReports] = useState<ApiScan[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiGetScans().then(setReports).catch(() => toast.error("Failed to load reports.")).finally(() => setLoading(false));
+  }, []);
 
   return (
     <DashboardLayout title="Download Reports">
       <div className="mb-8">
         <h2 className="font-heading text-2xl font-bold text-foreground">Download Reports</h2>
-        <p className="text-sm text-muted-foreground">
-          Download plagiarism reports for your confirmed document scans
-        </p>
+        <p className="text-sm text-muted-foreground">Download plagiarism reports for your scanned documents</p>
       </div>
 
-      {reports.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : reports.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No reports yet. Complete an upload and confirm your document to generate a report.
+            No reports yet. Upload a document to generate a plagiarism report.
           </CardContent>
         </Card>
       ) : (
@@ -40,40 +43,23 @@ const Reports = () => {
                     <FileText className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">
-                      {r.fileName.replace(/\.[^.]+$/, "")} — Plagiarism Report
-                    </p>
+                    <p className="font-medium text-foreground">{r.fileName.replace(/\.[^.]+$/, "")} — Plagiarism Report</p>
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        {format(new Date(r.createdAt), "MMM d, yyyy")}
+                        {safeFormat(r.createdAt)}
                       </span>
                       <span>•</span>
                       <span>{r.matchedSections.length} matches</span>
                       <span>•</span>
-                      <span
-                        className={
-                          r.plagiarismPercent > 40
-                            ? "text-destructive"
-                            : r.plagiarismPercent > 20
-                              ? "text-yellow-600"
-                              : "text-success"
-                        }
-                      >
+                      <span className={r.plagiarismPercent >= 50 ? "text-destructive" : r.plagiarismPercent >= 21 ? "text-yellow-600" : "text-emerald-600"}>
                         {r.plagiarismPercent}% similarity
                       </span>
                     </div>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => {
-                    downloadScanReport(r);
-                    toast.success("Report downloaded");
-                  }}
-                >
+                <Button variant="outline" size="sm" className="gap-2"
+                  onClick={() => { downloadScanReport(r as never); toast.success("Report downloaded"); }}>
                   <Download className="h-4 w-4" /> Download
                 </Button>
               </CardContent>

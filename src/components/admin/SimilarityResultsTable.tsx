@@ -8,12 +8,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { SimilarityResult } from "@/lib/adminData";
+import type { ApiSimilarityResult } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import PlagiarismBadge from "./PlagiarismBadge";
 
 interface SimilarityResultsTableProps {
-  results: SimilarityResult[];
+  results: ApiSimilarityResult[];
   compact?: boolean;
 }
 

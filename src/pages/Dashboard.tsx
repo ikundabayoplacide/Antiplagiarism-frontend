@@ -1,47 +1,54 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { FileText, Upload, CheckCircle, AlertTriangle, BarChart3 } from "lucide-react";
+import { FileText, Upload, CheckCircle, AlertTriangle, BarChart3, Loader2 } from "lucide-react";
 import StudentLayout from "@/components/student/StudentLayout";
 import StudentStatCard from "@/components/student/StudentStatCard";
 import QuickActions from "@/components/student/QuickActions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getStudentGreeting } from "@/lib/studentData";
-import { apiGetDocuments, type ApiDocument } from "@/lib/api";
+import { apiGetStudentStats, apiGetScans, type ApiStudentStats, type ApiScan } from "@/lib/api";
 
 const Dashboard = () => {
-  const [documents, setDocuments] = useState<ApiDocument[]>([]);
+  const [stats, setStats] = useState<ApiStudentStats>({ total: 0, original: 0, flagged: 0, reports: 0, avgSimilarity: 0 });
+  const [recentScans, setRecentScans] = useState<ApiScan[]>([]);
+  const [loading, setLoading] = useState(true);
   const greeting = getStudentGreeting();
 
   useEffect(() => {
-    apiGetDocuments().then(setDocuments).catch(() => {});
+    Promise.all([
+      apiGetStudentStats().then(setStats).catch(() => {}),
+      apiGetScans().then((scans) => setRecentScans(scans.slice(0, 5))).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, []);
-
-  const total = documents.length;
-  const recentDocs = documents.slice(0, 5);
 
   return (
     <StudentLayout title="Anti-Plagiarism System">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      {loading ? (
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (<>
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
           <h2 className="font-heading text-2xl font-bold text-foreground">Welcome back, {greeting}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Upload documents, track plagiarism results, and download reports for your research projects.
           </p>
-        </div>
-        <Link to="/dashboard/upload">
+          </div>
+          <Link to="/dashboard/upload">
           <Button className="gap-2 shadow-sm">
             <Upload className="h-4 w-4" />
             Upload Document
           </Button>
         </Link>
-      </div>
+        </div>
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StudentStatCard icon={FileText} title="Total Submissions" value={total} subtitle="Documents checked" trend={8.2} trendUp />
-        <StudentStatCard icon={CheckCircle} title="Documents" value={total} subtitle="Uploaded files" iconColor="text-emerald-600" iconBg="bg-emerald-50" />
-        <StudentStatCard icon={AlertTriangle} title="Storage Used" value={`${(documents.reduce((s, d) => s + d.fileSize, 0) / 1024 / 1024).toFixed(1)} MB`} subtitle="Total file size" iconColor="text-red-600" iconBg="bg-red-50" />
-        <StudentStatCard icon={BarChart3} title="Recent Uploads" value={recentDocs.length} subtitle="Last 5 documents" iconColor="text-violet-600" iconBg="bg-violet-50" />
+        <StudentStatCard icon={FileText} title="Total Submissions" value={stats.total} subtitle="Documents checked" trend={8.2} trendUp />
+        <StudentStatCard icon={CheckCircle} title="Original" value={stats.original} subtitle="Clean documents" iconColor="text-emerald-600" iconBg="bg-emerald-50" />
+        <StudentStatCard icon={AlertTriangle} title="Flagged" value={stats.flagged} subtitle="Plagiarism detected" iconColor="text-red-600" iconBg="bg-red-50" />
+        <StudentStatCard icon={BarChart3} title="Avg Similarity" value={`${stats.avgSimilarity}%`} subtitle="Across all scans" iconColor="text-violet-600" iconBg="bg-violet-50" />
       </div>
 
       <div className="mb-8">
@@ -56,16 +63,19 @@ const Dashboard = () => {
             <Link to="/dashboard/documents" className="text-sm font-medium text-primary hover:underline">View all</Link>
           </CardHeader>
           <CardContent>
-            {recentDocs.length === 0 ? (
+            {recentScans.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">No documents yet. Upload a document to get started.</p>
             ) : (
               <div className="space-y-3">
-                {recentDocs.map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+                {recentScans.map((scan) => (
+                  <div key={scan.id} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">{doc.fileName ?? doc.id}</p>
-                      <p className="text-xs text-muted-foreground">{(doc.fileSize / 1024).toFixed(1)} KB</p>
+                      <p className="truncate text-sm font-medium text-foreground">{scan.fileName}</p>
+                      <p className="text-xs text-muted-foreground">{(scan.fileSize / 1024).toFixed(1)} KB · {scan.plagiarismPercent}% similarity</p>
                     </div>
+                    <span className={`ml-3 rounded-full px-2 py-0.5 text-xs font-semibold ${scan.status === "flagged" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+                      {scan.status}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -75,24 +85,27 @@ const Dashboard = () => {
 
         <Card className="border-border/60 shadow-sm">
           <CardHeader>
-            <CardTitle className="font-heading text-lg">Latest Uploads</CardTitle>
+            <CardTitle className="font-heading text-lg">Plagiarism Overview</CardTitle>
           </CardHeader>
           <CardContent>
-            {documents.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">No results yet. Upload a document to run a plagiarism check.</p>
-            ) : (
-              <div className="space-y-3">
-                {documents.slice(0, 3).map((doc) => (
-                  <div key={doc.id} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-                    <p className="truncate text-sm font-medium text-foreground">{doc.fileName ?? doc.id}</p>
-                    <span className="text-xs text-muted-foreground">{(doc.fileSize / 1024).toFixed(1)} KB</span>
-                  </div>
-                ))}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <span className="text-sm font-medium text-emerald-700">Original documents</span>
+                <span className="font-bold text-emerald-700">{stats.original}</span>
               </div>
-            )}
+              <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3">
+                <span className="text-sm font-medium text-red-700">Flagged documents</span>
+                <span className="font-bold text-red-700">{stats.flagged}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-violet-200 bg-violet-50 p-3">
+                <span className="text-sm font-medium text-violet-700">Average similarity</span>
+                <span className="font-bold text-violet-700">{stats.avgSimilarity}%</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
+      </>)}
     </StudentLayout>
   );
 };

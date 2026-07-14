@@ -20,6 +20,7 @@ const navItems: { icon: LucideIcon; label: string; path: string }[] = [
   { icon: Upload, label: "Upload Document", path: "/dashboard/upload" },
   { icon: FolderOpen, label: "My Documents", path: "/dashboard/documents" },
   { icon: Search, label: "Plagiarism Results", path: "/dashboard/results" },
+  { icon: History, label: "History", path: "/dashboard/history" },
   { icon: User, label: "Profile", path: "/dashboard/settings" },
 ];
 

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import PasswordInput from "@/components/PasswordInput";
-import { apiUpdateProfile, apiChangePassword } from "@/lib/api";
+import { apiUpdateSettings } from "@/lib/api";
 import { getSession, setSession } from "@/lib/storage";
 import { toast } from "sonner";
 
@@ -29,8 +29,8 @@ const LecturerProfilePage = () => {
     }
     setSavingProfile(true);
     try {
-      await apiUpdateProfile({ fullName: fullName.trim(), email: email.trim() });
-      setSession({ ...session!, fullName: fullName.trim(), email: email.trim() });
+      await apiUpdateSettings({ fullName: fullName.trim() });
+      setSession({ ...session!, fullName: fullName.trim() });
       toast.success("Profile updated successfully.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update profile.");
@@ -55,13 +55,8 @@ const LecturerProfilePage = () => {
     }
     setSavingPassword(true);
     try {
-      await apiChangePassword(currentPassword, newPassword);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      toast.success("Password changed successfully.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to change password.");
+      // Password change not supported via settings endpoint; show info
+      toast.info("Password change is not available via this interface.");
     } finally {
       setSavingPassword(false);
     }

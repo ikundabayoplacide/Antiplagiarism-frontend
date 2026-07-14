@@ -1,47 +1,48 @@
-import { useMemo, useState } from "react";
-import { format } from "date-fns";
-import { Clock, FileText, Search } from "lucide-react";
+import { useState, useEffect } from "react";
+
+import { Clock, FileText, Loader2, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import StudentLayout from "@/components/student/StudentLayout";
 import PlagiarismBadge from "@/components/admin/PlagiarismBadge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { getSubmissionHistory } from "@/lib/studentData";
-import { cn } from "@/lib/utils";
+import { apiGetScans, type ApiScan } from "@/lib/api";
+import { cn, safeFormat } from "@/lib/utils";
+import { toast } from "sonner";
 
 const SubmissionHistory = () => {
+  const [scans, setScans] = useState<ApiScan[]>([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const history = useMemo(
-    () =>
-      getSubmissionHistory().filter((s) =>
-        s.fileName.toLowerCase().includes(search.toLowerCase())
-      ),
-    [search]
-  );
+  useEffect(() => {
+    apiGetScans()
+      .then(setScans)
+      .catch(() => toast.error("Failed to load history."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const history = scans.filter((s) => s.fileName.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <StudentLayout title="Submission History">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-heading text-2xl font-bold text-foreground">Submission History</h2>
-          <p className="text-sm text-muted-foreground">
-            Chronological record of all your document submissions and plagiarism checks
-          </p>
+          <p className="text-sm text-muted-foreground">Chronological record of all your document submissions and plagiarism checks</p>
         </div>
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search submissions..."
-            className="pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input placeholder="Search submissions..." className="pl-10" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
 
-      {history.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : history.length === 0 ? (
         <Card className="border-border/60 shadow-sm">
           <CardContent className="py-16 text-center">
             <Clock className="mx-auto h-12 w-12 text-muted-foreground/50" />
@@ -69,23 +70,18 @@ const SubmissionHistory = () => {
                       </div>
                       <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        {format(new Date(item.createdAt), "MMMM d, yyyy 'at' h:mm a")}
+                        {safeFormat(item.createdAt, "MMMM d, yyyy 'at' h:mm a")}
                       </p>
                       <p className="mt-2 text-sm text-muted-foreground">
-                        {item.wordCount.toLocaleString()} words · {item.matchedSections.length} matches ·{" "}
-                        {item.originalPercent}% original
+                        {item.wordCount.toLocaleString()} words · {item.matchedSections.length} matches · {item.originalPercent}% original
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <PlagiarismBadge percent={item.plagiarismPercent} />
-                      <span
-                        className={cn(
-                          "rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize",
-                          item.status === "original"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-red-50 text-red-700"
-                        )}
-                      >
+                      <span className={cn(
+                        "rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize",
+                        item.status === "original" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                      )}>
                         {item.status}
                       </span>
                     </div>

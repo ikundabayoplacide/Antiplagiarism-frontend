@@ -1,34 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { HiOutlineTrash, HiOutlineUserAdd } from "react-icons/hi";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import PasswordInput from "@/components/PasswordInput";
-import { addUser, countScansForUser, deleteUser, getCurrentUser, getUsers } from "@/lib/storage";
+import { apiGetUsers, apiCreateAdminUser, apiDeleteAdminUser, type ApiUser } from "@/lib/api";
+import { getSession } from "@/lib/storage";
 import type { UserRole } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -39,56 +21,68 @@ const roleBadge = (role: string) => {
     student: "bg-muted text-muted-foreground",
   };
   return (
-    <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${styles[role]}`}>
+    <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${styles[role] ?? "bg-muted text-muted-foreground"}`}>
       {role}
     </span>
   );
 };
 
 const AdminUsers = () => {
-  const currentUser = getCurrentUser();
+  const session = getSession();
+  const [users, setUsers] = useState<ApiUser[]>([]);
   const [search, setSearch] = useState("");
-  const [refresh, setRefresh] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("student");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const users = useMemo(() => {
-    void refresh;
-    return getUsers().filter(
-      (u) =>
-        u.fullName.toLowerCase().includes(search.toLowerCase()) ||
-        u.email.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [search, refresh]);
-
-  const handleAdd = () => {
-    const result = addUser({ email, password, fullName, role });
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-    toast.success("User added");
-    setOpen(false);
-    setFullName("");
-    setEmail("");
-    setPassword("");
-    setRole("student");
-    setRefresh((r) => r + 1);
+  const fetchUsers = () => {
+    setLoading(true);
+    apiGetUsers().then(setUsers).finally(() => setLoading(false));
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (id === currentUser?.id) {
-      toast.error("You cannot delete your own account");
+  useEffect(() => { fetchUsers(); }, []);
+
+  const handleAdd = async () => {
+    if (!fullName.trim() || !email.trim() || !password.trim()) {
+      toast.error("Please fill in all required fields.");
       return;
     }
+    setSaving(true);
+    try {
+      await apiCreateAdminUser({ fullName, email, password, role, ...(phoneNumber.trim() && { phoneNumber }) });
+      toast.success("User created");
+      setOpen(false);
+      setFullName(""); setEmail(""); setPassword(""); setRole("student"); setPhoneNumber("");
+      fetchUsers();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create user");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (id === session?.userId) { toast.error("You cannot delete your own account"); return; }
     if (!confirm(`Delete user "${name}"?`)) return;
-    deleteUser(id);
-    setRefresh((r) => r + 1);
-    toast.success("User removed");
+    try {
+      await apiDeleteAdminUser(id);
+      toast.success("User removed");
+      fetchUsers();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete user");
+    }
   };
+
+  const filtered = users.filter(
+    (u) =>
+      u.fullName.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <AdminLayout title="Users Management">
@@ -99,14 +93,10 @@ const AdminUsers = () => {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
-              <HiOutlineUserAdd className="h-4 w-4" /> Add User
-            </Button>
+            <Button className="gap-2"><HiOutlineUserAdd className="h-4 w-4" /> Add User</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add new user</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Add new user</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Full name</Label>
@@ -121,11 +111,13 @@ const AdminUsers = () => {
                 <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
               <div className="space-y-2">
+                <Label>Phone number <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="e.g. 0501234567" />
+              </div>
+              <div className="space-y-2">
                 <Label>Role</Label>
                 <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="student">Student</SelectItem>
                     <SelectItem value="lecturer">Lecturer</SelectItem>
@@ -133,8 +125,8 @@ const AdminUsers = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button className="w-full" onClick={handleAdd}>
-                Create user
+              <Button className="w-full" onClick={handleAdd} disabled={saving}>
+                {saving ? "Creating…" : "Create user"}
               </Button>
             </div>
           </DialogContent>
@@ -156,30 +148,35 @@ const AdminUsers = () => {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Scans</TableHead>
+                  <TableHead>Department</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.fullName}</TableCell>
-                    <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                    <TableCell>{roleBadge(u.role)}</TableCell>
-                    <TableCell>{countScansForUser(u.id)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(u.id, u.fullName)}
-                        disabled={u.id === currentUser?.id}
-                      >
-                        <HiOutlineTrash className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {loading ? (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+                ) : filtered.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No users found.</TableCell></TableRow>
+                ) : (
+                  filtered.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-medium">{u.fullName}</TableCell>
+                      <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                      <TableCell>{roleBadge(u.role)}</TableCell>
+                      <TableCell className="text-muted-foreground">{u.department ?? "—"}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost" size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(u.id, u.fullName)}
+                          disabled={u.id === session?.userId}
+                        >
+                          <HiOutlineTrash className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

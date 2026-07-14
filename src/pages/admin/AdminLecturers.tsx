@@ -7,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiGetUsers, apiGetAssignmentsByLecturer, apiUnassignStudent, type ApiUser, type ApiAssignment } from "@/lib/api";
 import { toast } from "sonner";
-import { HiOutlineTrash } from "react-icons/hi";
 
 const AdminLecturers = () => {
   const [lecturers, setLecturers] = useState<ApiUser[]>([]);

@@ -40,13 +40,16 @@ const AdminStudents = () => {
   const handleAssign = async () => {
     if (!selectedStudent || !selectedLecturerId) return;
     setAssigning(true);
+    console.log("[assign] payload:", { lecturerId: selectedLecturerId, studentId: selectedStudent.id });
     try {
-      await apiAssignStudent(selectedLecturerId, selectedStudent.id);
+      const result = await apiAssignStudent(selectedLecturerId, selectedStudent.id);
+      console.log("[assign] success:", result);
       toast.success(`${selectedStudent.fullName} assigned successfully`);
       setSelectedStudent(null);
       setSelectedLecturerId("");
       fetchData();
     } catch (err) {
+      console.error("[assign] error:", err);
       toast.error(err instanceof Error ? err.message : "Assignment failed");
     } finally {
       setAssigning(false);

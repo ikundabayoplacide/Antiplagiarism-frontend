@@ -1,6 +1,14 @@
-import type { ScanRecord } from "./types";
+interface ScanLike {
+  fileName: string;
+  plagiarismPercent: number;
+  originalPercent: number;
+  wordCount: number;
+  status: string;
+  createdAt: string;
+  matchedSections: { text: string; source: string; similarity: number }[];
+}
 
-export function buildReportText(scan: ScanRecord): string {
+export function buildReportText(scan: ScanLike): string {
   const date = new Date(scan.createdAt).toLocaleString();
   const lines = [
     "ANTI-PLAGIARISM SYSTEM — PLAGIARISM REPORT",
@@ -8,7 +16,6 @@ export function buildReportText(scan: ScanRecord): string {
     "",
     `Document: ${scan.fileName}`,
     `Date: ${date}`,
-    `Algorithm: N-gram (trigram) analysis`,
     "",
     "SUMMARY",
     "-".repeat(30),
@@ -22,7 +29,7 @@ export function buildReportText(scan: ScanRecord): string {
   ];
 
   if (scan.matchedSections.length === 0) {
-    lines.push("No significant N-gram matches found.");
+    lines.push("No significant matches found.");
   } else {
     scan.matchedSections.forEach((m, i) => {
       lines.push("");
@@ -35,7 +42,7 @@ export function buildReportText(scan: ScanRecord): string {
   return lines.join("\n");
 }
 
-export function downloadScanReport(scan: ScanRecord) {
+export function downloadScanReport(scan: ScanLike) {
   const text = buildReportText(scan);
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);

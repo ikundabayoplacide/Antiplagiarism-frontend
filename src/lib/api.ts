@@ -69,41 +69,124 @@ export async function apiRegister(payload: {
   }
 }
 
-// ——— Documents ———
-export interface ApiDocument {
+// ——— Student Scans ———
+export interface ApiScan {
   id: string;
-  fileName?: string;
-  fileType: string;
+  fileName: string;
   fileSize: number;
+  fileType: string;
+  wordCount: number;
+  plagiarismPercent: number;
+  originalPercent: number;
+  status: "original" | "flagged";
+  matchedSections: { text: string; source: string; similarity: number }[];
   createdAt: string;
-  content?: string;
 }
 
-function getMimeType(fileName: string): string {
-  const ext = fileName.split(".").pop()?.toLowerCase();
-  const map: Record<string, string> = {
-    pdf: "application/pdf",
-    doc: "application/msword",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    txt: "text/plain",
-  };
-  return map[ext ?? ""] || "application/octet-stream";
+export interface ApiStudentStats {
+  total: number;
+  original: number;
+  flagged: number;
+  reports: number;
+  avgSimilarity: number;
 }
 
-export async function apiUploadDocument(file: File): Promise<ApiDocument> {
+export async function apiUploadScan(file: File): Promise<ApiScan> {
   try {
     const form = new FormData();
     form.append("file", file);
-    form.append("fileName", file.name);
-    const fileType = file.type || getMimeType(file.name);
-    form.append("fileType", fileType);
-    const { data } = await api.post<ApiDocument>("/documents", form, {
+    const { data } = await api.post<ApiScan>("/student/scans", form, {
       headers: { "Content-Type": "multipart/form-data" },
     });
-    return { ...data, fileName: data.fileName ?? file.name };
+    return data;
   } catch (err) {
     toApiError(err);
   }
+}
+
+export async function apiGetScans(): Promise<ApiScan[]> {
+  try {
+    const { data } = await api.get<ApiScan[]>("/student/scans");
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiGetScan(id: string): Promise<ApiScan> {
+  try {
+    const { data } = await api.get<ApiScan>(`/student/scans/${id}`);
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiDeleteScan(id: string): Promise<void> {
+  try {
+    await api.delete(`/student/scans/${id}`);
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiGetStudentStats(): Promise<ApiStudentStats> {
+  try {
+    const { data } = await api.get<ApiStudentStats>("/student/stats");
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+// ——— Admin ———
+export interface ApiAdminStats {
+  totalUsers: number;
+  totalDocuments: number;
+  totalChecks: number;
+  totalReports: number;
+}
+
+export interface ApiAdminDocument {
+  id: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  uploadedBy?: string;
+  createdAt: string;
+}
+
+export interface ApiSimilarityResult {
+  id: string;
+  documentName: string;
+  comparedWith: string;
+  similarityPercent: number;
+}
+
+export interface ApiChartPoint {
+  month: string;
+  value: number;
+}
+
+export interface ApiPlagiarismStat {
+  name: string;
+  low: number;
+  medium: number;
+  high: number;
+}
+
+export interface ApiUserActivity {
+  day: string;
+  students: number;
+  lecturers: number;
+  admins?: number;
+}
+
+export interface ApiNotification {
+  id: string | number;
+  title: string;
+  message: string;
+  time: string;
 }
 
 export async function apiGetUsers(): Promise<ApiUser[]> {
@@ -115,43 +198,96 @@ export async function apiGetUsers(): Promise<ApiUser[]> {
   }
 }
 
-export async function apiGetDocuments(): Promise<ApiDocument[]> {
+export async function apiCreateAdminUser(payload: {
+  fullName: string;
+  email: string;
+  password: string;
+  role: string;
+  phoneNumber?: string;
+}): Promise<ApiUser> {
   try {
-    const { data } = await api.get<ApiDocument[]>("/documents");
+    const { data } = await api.post<ApiUser>("/admin/users", payload);
     return data;
   } catch (err) {
     toApiError(err);
   }
 }
 
-export async function apiGetDocument(id: string): Promise<ApiDocument> {
+export async function apiDeleteAdminUser(id: string): Promise<void> {
   try {
-    const { data } = await api.get<ApiDocument>(`/documents/${id}`);
+    await api.delete(`/admin/users/${id}`);
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiGetAdminStats(): Promise<ApiAdminStats> {
+  try {
+    const { data } = await api.get<ApiAdminStats>("/admin/stats");
     return data;
   } catch (err) {
     toApiError(err);
   }
 }
 
-export async function apiDeleteDocument(id: string): Promise<void> {
+export async function apiGetAdminDocuments(): Promise<ApiAdminDocument[]> {
   try {
-    await api.delete(`/documents/${id}`);
+    const { data } = await api.get<ApiAdminDocument[]>("/admin/documents");
+    return data;
   } catch (err) {
     toApiError(err);
   }
 }
 
-export async function apiUpdateDocument(id: string, payload: { file?: File; fileName?: string }): Promise<ApiDocument> {
+export async function apiGetAdminSimilarity(): Promise<ApiSimilarityResult[]> {
   try {
-    const form = new FormData();
-    if (payload.file) {
-      form.append("file", payload.file);
-      form.append("fileType", payload.file.type || getMimeType(payload.file.name));
-    }
-    if (payload.fileName) form.append("fileName", payload.fileName);
-    const { data } = await api.put<ApiDocument>(`/documents/${id}`, form, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const { data } = await api.get<ApiSimilarityResult[]>("/admin/similarity");
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiGetDocumentsPerMonth(): Promise<ApiChartPoint[]> {
+  try {
+    const { data } = await api.get<ApiChartPoint[]>("/admin/documents-per-month");
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiGetPlagiarismStats(): Promise<ApiPlagiarismStat[]> {
+  try {
+    const { data } = await api.get<ApiPlagiarismStat[]>("/admin/plagiarism-stats");
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiGetUserActivity(): Promise<ApiUserActivity[]> {
+  try {
+    const { data } = await api.get<ApiUserActivity[]>("/admin/user-activity");
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiGetAdminNotifications(): Promise<ApiNotification[]> {
+  try {
+    const { data } = await api.get<ApiNotification[]>("/admin/notifications");
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+// ——— Lecturer ———
+export async function apiGetLecturerScans(): Promise<ApiScan[]> {
+  try {
+    const { data } = await api.get<ApiScan[]>("/lecturer/scans");
     return data;
   } catch (err) {
     toApiError(err);
@@ -209,7 +345,7 @@ export async function apiGetAssignments(): Promise<ApiAssignment[]> {
 
 export async function apiAssignStudent(lecturerId: string, studentId: string): Promise<ApiAssignment> {
   try {
-    const { data } = await api.post<ApiAssignment>("/admin/assignments", { lecturerId, studentId });
+    const { data } = await api.post<ApiAssignment>("/admin/assign", { lecturerId, studentId });
     return data;
   } catch (err) {
     toApiError(err);
@@ -218,7 +354,7 @@ export async function apiAssignStudent(lecturerId: string, studentId: string): P
 
 export async function apiUnassignStudent(assignmentId: string): Promise<void> {
   try {
-    await api.delete(`/admin/assignments/${assignmentId}`);
+    await api.delete(`/admin/unassign/${assignmentId}`);
   } catch (err) {
     toApiError(err);
   }
@@ -226,7 +362,7 @@ export async function apiUnassignStudent(assignmentId: string): Promise<void> {
 
 export async function apiGetAssignmentsByLecturer(lecturerId: string): Promise<ApiAssignment[]> {
   try {
-    const { data } = await api.get<ApiAssignment[]>(`/admin/assignments/lecturer/${lecturerId}`);
+    const { data } = await api.get<ApiAssignment[]>(`/admin/assignments/${lecturerId}/students`);
     return data;
   } catch (err) {
     toApiError(err);
@@ -234,22 +370,6 @@ export async function apiGetAssignmentsByLecturer(lecturerId: string): Promise<A
 }
 
 // ——— Settings ———
-export async function apiUpdateProfile(payload: { fullName?: string; email?: string }): Promise<void> {
-  try {
-    await api.put("/settings/profile", payload);
-  } catch (err) {
-    toApiError(err);
-  }
-}
-
-export async function apiChangePassword(currentPassword: string, newPassword: string): Promise<void> {
-  try {
-    await api.put("/settings/change-password", { currentPassword, newPassword });
-  } catch (err) {
-    toApiError(err);
-  }
-}
-
 export interface ApiSettings {
   fullName: string;
   email: string;
