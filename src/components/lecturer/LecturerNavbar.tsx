@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { getCurrentUser } from "@/lib/storage";
-import { LECTURER_NOTIFICATIONS } from "@/data/lecturerData";
+import { useNotifications } from "@/hooks/useNotifications";
 import LecturerSidebar from "./LecturerSidebar";
 
 interface LecturerNavbarProps {
@@ -31,6 +31,7 @@ const LecturerNavbar = ({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
   const user = getCurrentUser();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications("lecturer");
 
   useEffect(() => {
     const options: Intl.DateTimeFormatOptions = {
@@ -89,23 +90,35 @@ const LecturerNavbar = ({
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl hover:bg-muted">
               <FaBell className="h-4.5 w-4.5 text-muted-foreground hover:text-foreground transition-colors" />
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-destructive animate-pulse border-2 border-background" />
+              {unreadCount > 0 && (
+                <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-destructive animate-pulse border-2 border-background" />
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80 p-2 rounded-xl">
-            <DropdownMenuLabel className="font-heading text-sm px-3 py-2">
-              Notifications
+            <DropdownMenuLabel className="font-heading text-sm px-3 py-2 flex items-center justify-between">
+              <span>Notifications</span>
+              {unreadCount > 0 && (
+                <button onClick={markAllRead} className="text-[10px] text-blue-600 hover:underline font-normal">Mark all read</button>
+              )}
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="my-1" />
             <div className="max-h-64 overflow-y-auto space-y-1">
-              {LECTURER_NOTIFICATIONS.map((n) => (
+              {notifications.length === 0 ? (
+                <p className="text-xs text-muted-foreground px-3 py-4 text-center">No notifications</p>
+              ) : notifications.map((n) => (
                 <DropdownMenuItem
                   key={n.id}
-                  className="flex flex-col items-start gap-1 p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors focus:bg-muted"
+                  className={`flex flex-col items-start gap-1 p-3 rounded-lg cursor-pointer transition-colors focus:bg-muted ${
+                    n.read ? "hover:bg-muted opacity-60" : "hover:bg-muted bg-blue-500/5"
+                  }`}
+                  onClick={() => !n.read && markRead(n.id)}
                 >
                   <div className="flex w-full items-center justify-between">
                     <span className="text-xs font-semibold text-foreground">{n.title}</span>
-                    <span className="text-[10px] text-muted-foreground font-medium">{n.time}</span>
+                    <span className="text-[10px] text-muted-foreground font-medium">
+                      {new Date(n.createdAt).toLocaleDateString()}
+                    </span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">{n.message}</p>
                 </DropdownMenuItem>

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { getCurrentUser } from "@/lib/storage";
-import { STUDENT_NOTIFICATIONS } from "@/lib/studentData";
+import { useNotifications } from "@/hooks/useNotifications";
 import StudentSidebar from "./StudentSidebar";
 
 interface StudentNavbarProps {
@@ -25,6 +25,7 @@ const StudentNavbar = ({ title = "Anti-Plagiarism System" }: StudentNavbarProps)
   const [search, setSearch] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const user = getCurrentUser();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications("student");
   const initials = user?.fullName
     ?.split(" ")
     .map((n) => n[0])
@@ -65,17 +66,34 @@ const StudentNavbar = ({ title = "Anti-Plagiarism System" }: StudentNavbarProps)
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-5 w-5" />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />
+              {unreadCount > 0 && (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuLabel className="flex items-center justify-between">
+              <span>Notifications</span>
+              {unreadCount > 0 && (
+                <button onClick={markAllRead} className="text-[10px] text-blue-600 hover:underline font-normal">Mark all read</button>
+              )}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {STUDENT_NOTIFICATIONS.map((n) => (
-              <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-0.5 py-3">
+            {notifications.length === 0 ? (
+              <p className="text-xs text-muted-foreground px-3 py-4 text-center">No notifications</p>
+            ) : notifications.map((n) => (
+              <DropdownMenuItem
+                key={n.id}
+                className={`flex flex-col items-start gap-0.5 py-3 cursor-pointer ${
+                  n.read ? "opacity-60" : "bg-blue-500/5"
+                }`}
+                onClick={() => !n.read && markRead(n.id)}
+              >
                 <span className="text-sm font-medium">{n.title}</span>
                 <span className="text-xs text-muted-foreground">{n.message}</span>
-                <span className="text-[10px] text-muted-foreground/70">{n.time}</span>
+                <span className="text-[10px] text-muted-foreground/70">
+                  {new Date(n.createdAt).toLocaleDateString()}
+                </span>
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

@@ -9,12 +9,24 @@ import { apiGetLecturerProjects, type LecturerProject } from "@/lib/api";
 import ProjectDetailsModal from "@/components/lecturer/ProjectDetailsModal";
 import { toast } from "sonner";
 
-const statusColor = (status: LecturerProject["status"]) => {
-  switch (status) {
-    case "Low": return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-    case "Medium": return "bg-amber-500/10 text-amber-600 border-amber-500/20";
-    case "High": return "bg-rose-500/10 text-rose-600 border-rose-500/20";
-  }
+const deriveStatus = (p?: number): string => {
+  if (p === undefined) return "—";
+  if (p <= 20) return "Low";
+  if (p <= 49) return "Medium";
+  return "High";
+};
+
+const statusColor = (p?: number) => {
+  if (p === undefined) return "bg-muted/30 text-muted-foreground border-border";
+  if (p <= 20) return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+  if (p <= 49) return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+  return "bg-rose-500/10 text-rose-600 border-rose-500/20";
+};
+
+const formatDate = (val?: string) => {
+  if (!val) return "—";
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
 };
 
 const LecturerProjectsPage = () => {
@@ -40,7 +52,9 @@ const LecturerProjectsPage = () => {
 
   const handleDownload = (p: LecturerProject) => {
     setDownloading(p.id);
-    const text = `PLAGIARISM REPORT\n${'='.repeat(40)}\nTitle: ${p.title}\nStudent: ${p.studentName}\nSimilarity: ${p.similarityPercent}%\nStatus: ${p.status}\nSubmitted: ${p.dateSubmitted}\n${'='.repeat(40)}`;
+    const status = p.status ?? deriveStatus(p.similarityPercent);
+    const similarity = p.similarityPercent !== undefined ? `${p.similarityPercent}%` : "—";
+    const text = `PLAGIARISM REPORT\n${'='.repeat(40)}\nTitle: ${p.title}\nStudent: ${p.studentName}\nSimilarity: ${similarity}\nStatus: ${status}\nSubmitted: ${p.dateSubmitted}\n${'='.repeat(40)}`;
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = window.document.createElement("a");
@@ -116,14 +130,16 @@ const LecturerProjectsPage = () => {
                       <p className="font-medium text-foreground">{p.studentName}</p>
                       <p className="text-muted-foreground">{p.studentEmail}</p>
                     </TableCell>
-                    <TableCell className="text-xs font-bold">{p.similarityPercent}%</TableCell>
+                    <TableCell className={`text-xs font-bold ${p.similarityPercent === undefined ? "text-muted-foreground" : p.similarityPercent >= 50 ? "text-rose-600" : p.similarityPercent >= 21 ? "text-amber-500" : "text-emerald-600"}`}>
+                      {p.similarityPercent !== undefined ? `${p.similarityPercent}%` : "—"}
+                    </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`rounded-lg text-[10px] font-bold ${statusColor(p.status)}`}>
-                        {p.status}
+                      <Badge variant="outline" className={`rounded-lg text-[10px] font-bold ${statusColor(p.similarityPercent)}`}>
+                        {p.status ?? deriveStatus(p.similarityPercent)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {new Date(p.dateSubmitted).toLocaleDateString()}
+                      {formatDate(p.dateSubmitted)}
                     </TableCell>
                     <TableCell className="text-right pr-6">
                       <div className="flex items-center justify-end gap-2">

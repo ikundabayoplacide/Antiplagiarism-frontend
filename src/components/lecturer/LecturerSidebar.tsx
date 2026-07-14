@@ -23,10 +23,10 @@ interface SidebarItem {
 
 const navItems: SidebarItem[] = [
   { icon: FaChartPie, label: "Dashboard", path: "/lecturer" },
-  { icon: FaFileShield, label: "Plagiarism Reports", path: "/lecturer/reports" },
-  { icon: FaTriangleExclamation, label: "High Similarity Alerts", path: "/lecturer/alerts" },
   { icon: FaUserGraduate, label: "My Students", path: "/lecturer/students" },
   { icon: FaBookOpen, label: "Student Projects", path: "/lecturer/projects" },
+  { icon: FaFileShield, label: "Plagiarism Reports", path: "/lecturer/reports" },
+  { icon: FaTriangleExclamation, label: "High Similarity Alerts", path: "/lecturer/alerts" },
   { icon: FaCircleUser, label: "Profile", path: "/lecturer/profile" },
 ];
 

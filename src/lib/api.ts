@@ -294,23 +294,50 @@ export async function apiGetLecturerScans(): Promise<ApiScan[]> {
   }
 }
 
-// ——— Assignments ———
-export interface LecturerProject {
+// ——— Lecturer Reports ———
+export interface LecturerReport {
   id: string;
   title: string;
+  fileSize: number;
   studentName: string;
   studentId: string;
   studentEmail: string;
   dateSubmitted: string;
-  similarityPercent: number;
-  wordCount: number;
-  status: "Low" | "Medium" | "High";
+  similarityPercent?: number;
+  wordCount?: number;
+  status?: "Low" | "Medium" | "High";
+}
+
+export async function apiGetLecturerReports(): Promise<LecturerReport[]> {
+  try {
+    const { data } = await api.get<LecturerReport[]>("/lecturer/reports");
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+// ——— Assignments ———
+export interface LecturerProject {
+  id: string;
+  title: string;
+  fileSize: number;
+  studentName: string;
+  studentId: string;
+  studentEmail: string;
+  dateSubmitted: string;
+  similarityPercent?: number;
+  wordCount?: number;
+  status?: "Low" | "Medium" | "High";
 }
 
 export async function apiGetLecturerProjects(): Promise<LecturerProject[]> {
   try {
-    const { data } = await api.get<LecturerProject[]>("/lecturer/my-students/projects");
-    return data;
+    const { data } = await api.get<(LecturerProject & { createdAt?: string; submittedAt?: string })[]>("/lecturer/projects");
+    return data.map((p) => ({
+      ...p,
+      dateSubmitted: p.dateSubmitted ?? p.submittedAt ?? p.createdAt,
+    }));
   } catch (err) {
     toApiError(err);
   }
@@ -364,6 +391,33 @@ export async function apiGetAssignmentsByLecturer(lecturerId: string): Promise<A
   try {
     const { data } = await api.get<ApiAssignment[]>(`/admin/assignments/${lecturerId}/students`);
     return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+// ——— Notifications ———
+export interface ApiNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export async function apiGetNotifications(role: "student" | "lecturer" | "admin"): Promise<ApiNotification[]> {
+  try {
+    const { data } = await api.get<ApiNotification[]>(`/${role}/notifications`);
+    return data;
+  } catch (err) {
+    toApiError(err);
+  }
+}
+
+export async function apiMarkNotificationRead(role: "student" | "lecturer" | "admin", id: string): Promise<void> {
+  try {
+    await api.patch(`/${role}/notifications/${id}/read`);
   } catch (err) {
     toApiError(err);
   }

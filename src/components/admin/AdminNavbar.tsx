@@ -12,8 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { ADMIN_NOTIFICATIONS } from "@/lib/adminData";
 import { getCurrentUser } from "@/lib/storage";
+import { useNotifications } from "@/hooks/useNotifications";
 import AdminSidebar from "./AdminSidebar";
 
 interface AdminNavbarProps {
@@ -24,6 +24,7 @@ const AdminNavbar = ({ title = "Anti-Plagiarism System" }: AdminNavbarProps) => 
   const [search, setSearch] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const user = getCurrentUser();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications("admin");
   const initials = user?.fullName
     ?.split(" ")
     .map((n) => n[0])
@@ -64,17 +65,34 @@ const AdminNavbar = ({ title = "Anti-Plagiarism System" }: AdminNavbarProps) => 
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
               <HiOutlineBell className="h-5 w-5" />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
+              {unreadCount > 0 && (
+                <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuLabel className="flex items-center justify-between">
+              <span>Notifications</span>
+              {unreadCount > 0 && (
+                <button onClick={markAllRead} className="text-[10px] text-blue-600 hover:underline font-normal">Mark all read</button>
+              )}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {ADMIN_NOTIFICATIONS.map((n) => (
-              <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-0.5 py-3">
+            {notifications.length === 0 ? (
+              <p className="text-xs text-muted-foreground px-3 py-4 text-center">No notifications</p>
+            ) : notifications.map((n) => (
+              <DropdownMenuItem
+                key={n.id}
+                className={`flex flex-col items-start gap-0.5 py-3 cursor-pointer ${
+                  n.read ? "opacity-60" : "bg-blue-500/5"
+                }`}
+                onClick={() => !n.read && markRead(n.id)}
+              >
                 <span className="text-sm font-medium">{n.title}</span>
                 <span className="text-xs text-muted-foreground">{n.message}</span>
-                <span className="text-[10px] text-muted-foreground/70">{n.time}</span>
+                <span className="text-[10px] text-muted-foreground/70">
+                  {new Date(n.createdAt).toLocaleDateString()}
+                </span>
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

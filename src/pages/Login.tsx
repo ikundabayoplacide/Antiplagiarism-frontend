@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import PasswordInput from "@/components/PasswordInput";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mail, ArrowRight, ArrowLeft } from "lucide-react";
+import { Mail, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import MarketingLayout from "@/components/MarketingLayout";
 import { setSession, setToken } from "@/lib/storage";
@@ -21,17 +21,7 @@ const Login = () => {
   return (
     <MarketingLayout>
       <div className="flex flex-col items-center justify-center bg-muted/30 px-4 py-12 md:py-16">
-        <div className="mb-6 w-full max-w-md">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Home
-          </Link>
-        </div>
-
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-lg">
           <div className="mb-8 text-center">
             <h1 className="font-heading text-2xl font-bold text-foreground">Welcome Back</h1>
             <p className="mt-1 text-sm text-muted-foreground">Sign in to your account</p>
